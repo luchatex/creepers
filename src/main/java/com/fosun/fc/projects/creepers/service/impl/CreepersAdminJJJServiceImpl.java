@@ -1,0 +1,124 @@
+package com.fosun.fc.projects.creepers.service.impl;
+
+import com.fosun.fc.projects.creepers.annotation.IsTryAgain;
+import com.fosun.fc.projects.creepers.constant.BaseConstant;
+import com.fosun.fc.projects.creepers.dao.CreepersAdminBeijingDao;
+import com.fosun.fc.projects.creepers.downloader.CreditChinaDungDownloader;
+import com.fosun.fc.projects.creepers.downloader.HttpRequestDownloader;
+import com.fosun.fc.projects.creepers.dto.CreepersAdminBeijingDTO;
+import com.fosun.fc.projects.creepers.dto.CreepersParamDTO;
+import com.fosun.fc.projects.creepers.entity.TCreepersAdminBeijing;
+import com.fosun.fc.projects.creepers.pageprocessor.CreditChina.AdminJJJProcessor;
+import com.fosun.fc.projects.creepers.pipeline.CreditChina.AdminJJJPiepline;
+import com.fosun.fc.projects.creepers.pipeline.CreditChina.JsonLocalPipeline;
+import com.fosun.fc.projects.creepers.service.ICreepersAdminJJJService;
+import com.fosun.fc.projects.creepers.service.ICreepersTaskListService;
+import com.fosun.fc.projects.creepers.utils.CommonMethodUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import us.codecraft.webmagic.Request;
+import us.codecraft.webmagic.Spider;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+@Service
+@Transactional
+public class CreepersAdminJJJServiceImpl implements ICreepersAdminJJJService {
+
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Autowired
+    private AdminJJJProcessor adminJJJProcessor;
+
+    @Autowired
+    private AdminJJJPiepline adminJJJPiepline;
+
+    @Autowired
+    private CreepersAdminBeijingDao creepersAdminBeijingDao;
+
+    @Autowired
+    private ICreepersTaskListService creepersTaskListServiceImpl;
+
+    @Override
+    public Page<CreepersAdminBeijingDTO> findList(Map<String, Object> searchParams, int pageNumber, int pageSize,
+                                                  String sortType) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void processByJob(String JobName) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void processByRequest(String taskType) {
+
+        int threadNum = 30;
+
+        CreepersParamDTO param = new CreepersParamDTO();
+        param.putSearchKeyWord(taskType);
+        param.setTaskType(taskType);
+        param.setTaskStatus(BaseConstant.TaskListStatus.DEFAULT.getValue());
+
+        // 启动爬虫
+        logger.info("=============>>启动爬虫!");
+        Spider spider = Spider.create(adminJJJProcessor).addPipeline(new JsonLocalPipeline("/data/JJJ"))
+                .setDownloader(new HttpRequestDownloader().setParam(param)).thread(threadNum).setExitWhenComplete(false);
+        // 初始化Request
+        for (int i = 0; i < threadNum; i++) {
+            // 初始化Request
+            Request request = creepersTaskListServiceImpl.popRequest(taskType);
+            if (request != null) {
+                spider.addRequest(request);
+            }
+        }
+
+        spider.run();
+    }
+
+    @Override
+    public List<TCreepersAdminBeijing> findByTypeAndKey(String type, String key) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void saveEntity(TCreepersAdminBeijing entity) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void saveEntity(List<TCreepersAdminBeijing> entityList) {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    @IsTryAgain
+    public void saveOrUpdate(TCreepersAdminBeijing entity) {
+        List<TCreepersAdminBeijing> oldEntityList = creepersAdminBeijingDao.findByKey(entity.getKey());
+        if (!CommonMethodUtils.isEmpty(oldEntityList)) {
+            entity.setId(oldEntityList.get(0).getId());
+            entity.setUpdatedDt(new Date());
+            entity.setVersion(oldEntityList.get(0).getVersion());
+        }
+        creepersAdminBeijingDao.saveAndFlush(entity);
+    }
+
+    @IsTryAgain
+    @Override
+    public void saveOrUpdate(List<TCreepersAdminBeijing> entityList) {
+        for (int i = 0; i < entityList.size(); i++) {
+            saveOrUpdate(entityList.get(i));
+        }
+    }
+
+}
